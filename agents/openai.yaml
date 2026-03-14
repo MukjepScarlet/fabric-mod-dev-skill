@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fabric Mod Dev"
+  short_description: "Develop Minecraft Fabric mods in Gradle projects with Fabric Loom."
+  default_prompt: "Use this skill for Minecraft Fabric mod tasks in Gradle projects that include Fabric Loom plugins, including 1.21.x and year-prefixed versions like 26.1."
