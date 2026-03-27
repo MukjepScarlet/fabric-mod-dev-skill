@@ -15,6 +15,11 @@ Use this skill to execute Fabric tasks with a stable workflow and avoid re-disco
 4. If behavior depends on vanilla internals, inspect the Minecraft jar from Loom cache before editing.
 5. Run Gradle checks and fix compile/runtime issues.
 
+## Script Paths
+
+- Treat bundled `scripts/` paths as relative to this skill directory, not the target project root.
+- When invoking bundled Python scripts on macOS, try `python3` first; fall back to `python` only if `python3` is unavailable.
+
 ## Project Validation
 
 Run `python scripts/analyze_fabric_project.py --project-root <root> --require-loom --resolve-remote --json` from project root first.
