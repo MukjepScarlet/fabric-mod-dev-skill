@@ -16,7 +16,6 @@ Use this skill to execute Fabric tasks with a stable workflow and avoid re-disco
 5. Run Gradle checks and fix compile/runtime issues.
 
 ## Script Paths
-
 - Treat bundled `scripts/` paths as relative to this skill directory, not the target project root.
 - When invoking bundled Python scripts on macOS, try `python3` first; fall back to `python` only if `python3` is unavailable.
 
@@ -69,6 +68,7 @@ Dependency style migration in `dependencies`:
   - `modRuntimeOnly` -> `runtimeOnly`
 
 For version detection patterns and fallback order, read `references/versioning.md`.
+For same-mapping-family Minecraft version upgrades (for example Yarn-to-Yarn or official-to-official), read `references/version-upgrade.md`.
 For mapping namespace migration workflow, read `references/mappings-migration.md`.
 
 ## Vanilla Code Inspection
@@ -104,8 +104,11 @@ For lookup details and examples, read `references/minecraft-source-inspection.md
 
 ## Validation Commands
 
-- `./gradlew.bat build`
-- `./gradlew.bat test` (if tests exist)
-- Project-specific run tasks for Fabric client/server as configured in the project
+- `./gradlew compileKotlin` when the task exists in Java/Kotlin mixed projects.
+- `./gradlew compileJava --continue --console=plain`
+- `./gradlew validateAccessWidener` when the task exists.
+- `./gradlew classes` or `./gradlew build`
+- `./gradlew test` when tests exist.
+- Project-specific run tasks such as `runClient` or `runServer` only after compile/AW validation passes or when the user explicitly asks for runtime validation.
 
 Run only the smallest command set needed to verify the change.
