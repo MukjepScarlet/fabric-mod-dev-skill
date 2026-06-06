@@ -70,6 +70,7 @@ Dependency style migration in `dependencies`:
 For version detection patterns and fallback order, read `references/versioning.md`.
 For same-mapping-family Minecraft version upgrades (for example Yarn-to-Yarn or official-to-official), read `references/version-upgrade.md`.
 For mapping namespace migration workflow, read `references/mappings-migration.md`.
+For version-specific migration notes, check `references/version-migrations/` and load only the target pair that matches the task.
 
 ## Vanilla Code Inspection
 
@@ -97,6 +98,10 @@ For lookup details and examples, read `references/minecraft-source-inspection.md
 - Keep edits minimal and version-compatible with the project target.
 - Prefer existing patterns already used in the mod (registries, event wiring, mixin style).
 - When touching mixins, verify target class/member signatures against the resolved Minecraft jar.
+- For Minecraft version migrations, compare old and target vanilla sources before editing mixins whose target or locals changed.
+- Migrate in layers: first fix clearly equivalent target/name/descriptor changes, then separately handle behavior whose old target has no equivalent semantic point.
+- If a removed vanilla target cannot be migrated equivalently, skip that behavior temporarily and document the unresolved semantic migration instead of forcing a brittle hook.
+- Add concise version-scoped TODO comments when a migrated mixin preserves compilation but still needs runtime behavior revalidation.
 - For rendering or UI issues, inspect both:
   - `com.mojang.blaze3d.*` for low-level rendering paths
   - `net.minecraft.client.*` for client behavior

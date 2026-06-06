@@ -23,8 +23,10 @@ If the mapping namespace changes, use `references/mappings-migration.md` instead
 9. Run `validateAccessWidener` when present.
 10. Run `classes` or `build` only after the smaller compile/AW tasks give useful signal.
 11. Group errors by root cause, inspect old vanilla usage first, then inspect the equivalent target-version vanilla usage.
-12. Apply straightforward fixes directly. Ask the user before changes that affect architecture, behavior semantics, protocol/storage compatibility, or large rendering rewrites.
-13. Run `runClient` or `runServer` only after compile/AW validation passes, or when the user explicitly approves runtime validation.
+12. Apply straightforward equivalent fixes directly.
+13. For non-equivalent behavior migrations, skip them at first, keep them documented, and return after the straightforward layer is verified.
+14. Ask the user before changes that affect architecture, behavior semantics, protocol/storage compatibility, or large rendering rewrites.
+15. Run `runClient` or `runServer` only after compile/AW validation passes, or when the user explicitly approves runtime validation.
 
 ## Error Groups
 
@@ -45,3 +47,6 @@ If the mapping namespace changes, use `references/mappings-migration.md` instead
 - For removed vanilla block entities, check whether the block still exists as `BlockState` and migrate searches from block-entity iteration to block-state/range scanning when appropriate.
 - For third-party mod APIs compiled against removed vanilla classes, prefer upgrading the dependency. Code-side fixes cannot repair an incompatible dependency ABI.
 - When copying or partially reimplementing vanilla logic, add a concise Javadoc/KDoc `@see` using fully qualified vanilla class/member names.
+- When an IDE Mixin plugin or MCP inspection is available, use it for mixin target validation. Gradle compilation may miss unresolved `@At`, local capture, ordinal, and descriptor issues.
+- If both old and target vanilla sources are available, use them to identify the semantic migration point; do not rely only on matching names.
+- Treat commit-per-mixin or commit-per-related-group as useful hygiene, especially during large migrations, but follow the user's requested commit strategy.
