@@ -50,3 +50,9 @@ If the mapping namespace changes, use `references/mappings-migration.md` instead
 - When an IDE Mixin plugin or MCP inspection is available, use it for mixin target validation. Gradle compilation may miss unresolved `@At`, local capture, ordinal, and descriptor issues.
 - If both old and target vanilla sources are available, use them to identify the semantic migration point; do not rely only on matching names.
 - Treat commit-per-mixin or commit-per-related-group as useful hygiene, especially during large migrations, but follow the user's requested commit strategy.
+
+## Version-Specific References
+
+Load only the matching file when relevant:
+
+- `references/version-migrations/26.1-to-26.2.md` for renderer, GUI, camera culling, weather, item-hand, and slime bounce refactors across 26.1/26.2.

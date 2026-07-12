@@ -21,7 +21,9 @@ Use this skill to execute Fabric tasks with a stable workflow and avoid re-disco
 
 ## Project Validation
 
-Run `python scripts/analyze_fabric_project.py --project-root <root> --require-loom --resolve-remote --json` from project root first.
+Run `python scripts/analyze_fabric_project.py --project-root <root> --require-loom --json` from project root first.
+
+Add `--resolve-remote` only when local files do not provide enough version information, when you need to verify latest compatible versions, or when the task explicitly requires remote confirmation. Avoid HTTP requests when local project metadata is sufficient.
 
 - Require `build.gradle`, `build.gradle.kts`, or `settings.gradle(.kts)`.
 - Require Loom plugin id in build scripts:
@@ -38,7 +40,7 @@ If Loom plugin is missing, stop Fabric-specific edits and ask for project setup 
 - Treat `1.21.x` as standard semantic Minecraft versions.
 - Treat post-1.21 versions with year-prefix naming (for example `26.1`) as valid Minecraft versions.
 - Read version from `gradle.properties`, `*.gradle(.kts)`, and `*.versions.toml`.
-- For robust version resolution, fetch remote versions from:
+- Only when local metadata is insufficient or the task needs latest-version confirmation, fetch remote versions from:
   - `https://meta.fabricmc.net/v2/versions/game`
   - `https://meta.fabricmc.net/v2/versions/loader`
   - `https://meta.fabricmc.net/v2/versions/yarn` (only when Yarn is required)

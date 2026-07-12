@@ -21,6 +21,7 @@ LOOM_PLUGIN_IDS = (
     "net.fabricmc.fabric-loom",
     "net.fabricmc.fabric-loom-remap",
 )
+MINECRAFT_MODULE_IDS = {"com.mojang:minecraft", "net.minecraft:minecraft"}
 
 EXCLUDE_DIRS = {".git", ".gradle", "build", ".idea", ".kotlin"}
 GRADLE_FILE_NAMES = {"build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"}
@@ -29,6 +30,10 @@ FABRIC_META_GAME_URL = "https://meta.fabricmc.net/v2/versions/game"
 FABRIC_META_LOADER_URL = "https://meta.fabricmc.net/v2/versions/loader"
 FABRIC_META_YARN_URL = "https://meta.fabricmc.net/v2/versions/yarn"
 FABRIC_API_METADATA_URL = "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml"
+DIRECT_GRADLE_PLUGIN_RE = re.compile(r'''\bid\s*(?:\(\s*)?["'](?P<plugin>[^"']+)["']\s*\)?''')
+DEPENDENCY_COORDINATE_RE = re.compile(
+    r'''["'](com\.mojang:minecraft|net\.minecraft:minecraft|net\.fabricmc:yarn|net\.fabricmc:fabric-loader|net\.fabricmc\.fabric-api:fabric-api):([^"']+)["']'''
+)
 
 
 def iter_files(root: Path, file_predicate):
@@ -111,6 +116,11 @@ def parse_versions_toml(path: Path) -> dict:
         for k, v in libraries.items():
             if isinstance(v, dict):
                 module = v.get("module")
+                if not isinstance(module, str):
+                    group = v.get("group")
+                    name = v.get("name")
+                    if isinstance(group, str) and isinstance(name, str):
+                        module = f"{group}:{name}"
                 if isinstance(module, str):
                     data["libraries"][k] = {"module": module, "version": _resolve_toml_version(v, data["versions"])}
     return data
@@ -277,6 +287,14 @@ def detect_mapping_mode(gradle_texts: list[str], coord_hits: list[dict], toml_li
     return "unknown"
 
 
+def find_direct_loom_plugins(gradle_text: str) -> list[str]:
+    return [
+        match.group("plugin")
+        for match in DIRECT_GRADLE_PLUGIN_RE.finditer(gradle_text)
+        if match.group("plugin") in LOOM_PLUGIN_IDS
+    ]
+
+
 def resolve_remote_versions(
     minecraft_version: str | None,
     need_yarn: bool,
@@ -339,9 +357,8 @@ def analyze(root: Path, resolve_remote: bool = False, timeout_sec: float = 10.0,
     for gf in gradle_files:
         text = gf.read_text(encoding="utf-8", errors="ignore")
         gradle_texts.append(text)
-        for pid in LOOM_PLUGIN_IDS:
-            if pid in text:
-                loom_hits.append({"file": str(gf), "plugin": pid})
+        for pid in find_direct_loom_plugins(text):
+            loom_hits.append({"file": str(gf), "plugin": pid})
 
         for m in re.finditer(
             r"""(?im)^\s*(?:val|var)?\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["']([^"']+)["']""",
@@ -352,10 +369,7 @@ def analyze(root: Path, resolve_remote: bool = False, timeout_sec: float = 10.0,
             if any(t in key.lower() for t in ("minecraft", "fabric", "yarn", "loader")):
                 gradle_declared.append({"file": str(gf), "key": key, "value": val})
 
-        for m in re.finditer(
-            r"""["'](net\.minecraft:minecraft|net\.fabricmc:yarn|net\.fabricmc:fabric-loader|net\.fabricmc\.fabric-api:fabric-api):([^"']+)["']""",
-            text,
-        ):
+        for m in DEPENDENCY_COORDINATE_RE.finditer(text):
             coord_hits.append({"file": str(gf), "module": m.group(1), "version": m.group(2).strip()})
 
     property_hits = []
@@ -428,13 +442,12 @@ def analyze(root: Path, resolve_remote: bool = False, timeout_sec: float = 10.0,
     for item in coord_hits:
         module = item.get("module")
         value = item.get("version")
-        if module == "net.minecraft:minecraft" and isinstance(value, str) and MC_VERSION_RE.match(value):
+        if module in MINECRAFT_MODULE_IDS and isinstance(value, str) and MC_VERSION_RE.match(value):
             candidate_versions.append(value)
 
     mapping_mode = detect_mapping_mode(gradle_texts, coord_hits, toml_libraries)
-    primary_loom_plugin = None
-    if loom_hits:
-        primary_loom_plugin = sorted({x["plugin"] for x in loom_hits})[0]
+    loom_plugin_ids = sorted({x["plugin"] for x in loom_hits})
+    primary_loom_plugin = loom_plugin_ids[0] if len(loom_plugin_ids) == 1 else None
     yarn_required = mapping_mode == "yarn"
     if mapping_mode != "yarn" and primary_loom_plugin == "net.fabricmc.fabric-loom":
         yarn_required = False
@@ -447,7 +460,8 @@ def analyze(root: Path, resolve_remote: bool = False, timeout_sec: float = 10.0,
         "loom_plugin_hits": [
             {"file": f, "plugin": p} for f, p in sorted({(x["file"], x["plugin"]) for x in loom_hits})
         ],
-        "loom_plugin_found": bool(loom_hits),
+        "loom_plugin_found": bool(loom_plugin_ids),
+        "loom_plugin_ids": loom_plugin_ids,
         "properties_versions": property_hits,
         "gradle_declared_versions": gradle_declared,
         "dependency_coordinates": coord_hits,
@@ -472,7 +486,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Analyze Gradle Fabric project and resolve version/dependency hints.")
     parser.add_argument("--project-root", default=".", help="Path to project root.")
     parser.add_argument("--require-loom", action="store_true", help="Return exit code 2 if Loom plugin is not found.")
-    parser.add_argument("--resolve-remote", action="store_true", help="Fetch versions from Fabric Meta and Fabric API metadata.")
+    parser.add_argument(
+        "--resolve-remote",
+        action="store_true",
+        help="Fetch versions from Fabric Meta and Fabric API metadata only when local project files are insufficient or latest-version verification is required.",
+    )
     parser.add_argument("--remote-timeout", type=float, default=10.0, help="Remote request timeout in seconds.")
     parser.add_argument("--remote-limit", type=int, default=30, help="Maximum versions to keep for each remote source.")
     parser.add_argument("--json", action="store_true", help="Print JSON output.")

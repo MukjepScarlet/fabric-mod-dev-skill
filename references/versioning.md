@@ -6,7 +6,7 @@ Resolve target Minecraft version for Fabric mod tasks across both classic (`1.21
 
 ## Detection Order
 
-1. Run `python scripts/analyze_fabric_project.py --project-root <root> --resolve-remote --json`.
+1. Run `python scripts/analyze_fabric_project.py --project-root <root> --json`.
 2. Read `gradle.properties` and check keys such as:
    - `minecraft_version`
    - `minecraftVersion`
@@ -14,11 +14,12 @@ Resolve target Minecraft version for Fabric mod tasks across both classic (`1.21
 4. Read `*.gradle` / `*.gradle.kts` for:
    - direct version assignments
    - dependency coordinates (`net.minecraft:minecraft`, `net.fabricmc:yarn`, `fabric-loader`, `fabric-api`)
-5. If multiple modules differ, use the module directly related to the requested task.
+5. Add `--resolve-remote` only if the local scan is ambiguous, if compatibility must be checked against current upstream metadata, or if the user explicitly asks for latest-version verification.
+6. If multiple modules differ, use the module directly related to the requested task.
 
 ## Remote Source Of Truth
 
-Use these sources for robust latest-version checks:
+Use these sources only for robust latest-version or compatibility checks that cannot be resolved locally:
 
 - Game versions: `https://meta.fabricmc.net/v2/versions/game`
 - Fabric Loader versions: `https://meta.fabricmc.net/v2/versions/loader`
