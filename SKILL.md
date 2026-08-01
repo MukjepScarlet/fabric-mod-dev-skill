@@ -88,6 +88,16 @@ Use this cache root pattern:
 
 `.gradle/loom-cache/minecraftMaven/net/minecraft/minecraft-client|server|merged-$hash/$version/`
 
+`scripts/find_minecraft_jar.py` also reads source jars already present in that cache:
+
+```text
+python scripts/find_minecraft_jar.py --project-root <root> --version <version> read --class net.minecraft.client.gui.Font
+python scripts/find_minecraft_jar.py --project-root <root> --version <version> search --query SignRenderer
+python scripts/find_minecraft_jar.py --project-root <root> --version <version> grep --pattern "submitText\\("
+```
+
+The legacy command without a subcommand still lists candidate jars. Source-inspection commands never invoke Gradle; when a `-sources.jar` is absent, tell the user to run `genSources` rather than doing so automatically.
+
 Prioritize these package prefixes while tracing behavior:
 
 - `com.mojang.blaze3d`
