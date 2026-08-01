@@ -27,16 +27,17 @@ Start from these prefixes when tracking rendering, UI, world logic, networking, 
 
 ## Practical Workflow
 
-1. Use `python scripts/find_minecraft_jar.py --project-root <root>` to list candidate jars.
-2. When a sources jar exists, inspect it directly:
+1. Use `python scripts/find_minecraft_jar.py --project-root <root>` to list candidate jars. Supply `--version` to source-inspection commands when the cache contains multiple Minecraft versions.
+2. When a sources jar exists, inspect it directly. If that version has multiple sources jars, select its cache directory with `--variant <minecraft-merged-hash>` or pass the exact `--jar <path-to-sources.jar>`:
 
    ```text
    python scripts/find_minecraft_jar.py --project-root <root> --version <version> read --class net.minecraft.client.gui.Font
    python scripts/find_minecraft_jar.py --project-root <root> --version <version> search --query SignRenderer
    python scripts/find_minecraft_jar.py --project-root <root> --version <version> grep --pattern "submitText\\("
+   python scripts/find_minecraft_jar.py --project-root <root> --version <version> --variant minecraft-merged-<hash> read --class net.minecraft.client.gui.Font
    ```
 
-   `search` matches Java entry paths case-insensitively. `grep` accepts a Python regular expression and prints `jar!/entry:line:text`; use `--json` for structured results and `--limit` to bound output.
+   `read --class` accepts `net.minecraft.client.gui.Font`, `net.minecraft.client.gui.Font.java`, and `net/minecraft/client/gui/Font.java`. `search` matches Java entry paths case-insensitively. `grep` accepts a Python regular expression and prints `jar!/entry:line:text`; use `--json` for structured results and `--limit` to bound output.
 3. Optionally run `./gradlew genSources` (or `./gradlew.bat genSources`) to let Loom generate sources jars.
 4. If `accessWidener` is configured, `genSources` can apply/validate it (for example this project executes `validateAccessWidener` before `genSources`).
 5. Open/decompile the jar or generated sources with your preferred Java decompiler/IDE.

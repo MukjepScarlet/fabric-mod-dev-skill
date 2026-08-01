@@ -82,6 +82,8 @@ When a task needs original game logic, locate Loom cache jars with:
 
 `python scripts/find_minecraft_jar.py --project-root <root> [--version <version>]`
 
+Use `--version` for `read`, `search`, and `grep` whenever the cache contains multiple Minecraft versions. If one version has multiple Loom cache variants, pass `--variant <minecraft-merged-hash>` or an exact `--jar <path-to-sources.jar>` from the `find` output.
+
 Optional: run `./gradlew genSources` (or `./gradlew.bat genSources` on Windows) to generate/decompile Minecraft sources jar via Loom.
 - This task can apply project `accessWidener` configuration when present (validated by `validateAccessWidener` in this project run).
 - This task is not required; reading classes directly from Minecraft jars is still valid.
@@ -96,9 +98,10 @@ Use this cache root pattern:
 python scripts/find_minecraft_jar.py --project-root <root> --version <version> read --class net.minecraft.client.gui.Font
 python scripts/find_minecraft_jar.py --project-root <root> --version <version> search --query SignRenderer
 python scripts/find_minecraft_jar.py --project-root <root> --version <version> grep --pattern "submitText\\("
+python scripts/find_minecraft_jar.py --project-root <root> --version <version> --variant minecraft-merged-<hash> read --class net.minecraft.client.gui.Font
 ```
 
-The legacy command without a subcommand still lists candidate jars. Source-inspection commands never invoke Gradle; when a `-sources.jar` is absent, tell the user to run `genSources` rather than doing so automatically.
+The legacy command without a subcommand still lists candidate jars. Source-inspection commands require one unambiguous sources jar and never invoke Gradle; when a `-sources.jar` is absent, tell the user to run `genSources` rather than doing so automatically.
 
 Prioritize these package prefixes while tracing behavior:
 

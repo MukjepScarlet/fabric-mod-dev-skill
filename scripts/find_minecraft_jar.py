@@ -24,7 +24,11 @@ def minecraft_cache_root(project_root: str) -> Path:
     return Path(project_root).resolve() / ".gradle" / "loom-cache" / "minecraftMaven" / "net" / "minecraft"
 
 
-def find_jars(mc_root: Path, version: str | None) -> list[Path]:
+def cache_variant(path: Path) -> str:
+    return path.parent.parent.name
+
+
+def find_jars(mc_root: Path, version: str | None, variant: str | None = None) -> list[Path]:
     jars = []
     for path in mc_root.rglob("*.jar"):
         path_string = str(path)
@@ -32,12 +36,14 @@ def find_jars(mc_root: Path, version: str | None) -> list[Path]:
             continue
         if version and version not in path.parts:
             continue
+        if variant and cache_variant(path) != variant:
+            continue
         jars.append(path)
     return sorted(jars, key=lambda path: (priority(path), str(path)))
 
 
-def find_source_jars(mc_root: Path, version: str | None) -> list[Path]:
-    return [path for path in find_jars(mc_root, version) if path.name.endswith("-sources.jar")]
+def find_source_jars(mc_root: Path, version: str | None, variant: str | None = None) -> list[Path]:
+    return [path for path in find_jars(mc_root, version, variant) if path.name.endswith("-sources.jar")]
 
 
 def emit_paths(paths: list[Path], as_json: bool) -> None:
@@ -49,19 +55,56 @@ def emit_paths(paths: list[Path], as_json: bool) -> None:
 
 
 def source_entry(class_name: str) -> str:
-    if class_name.endswith(".java"):
-        return class_name.replace("\\", "/")
-    return f"{class_name.replace('.', '/')}.java"
+    name = class_name.strip().replace("\\", "/")
+    if name.endswith(".java"):
+        name = name[:-5]
+    return f"{name.replace('.', '/')}.java"
 
 
-def require_source_jars(mc_root: Path, version: str | None) -> list[Path] | None:
-    source_jars = find_source_jars(mc_root, version)
-    if source_jars:
-        return source_jars
+def require_source_jar(
+    mc_root: Path,
+    version: str | None,
+    variant: str | None,
+    jar_path: str | None,
+) -> Path | None:
+    if jar_path:
+        jar = Path(jar_path).resolve()
+        if not jar.is_file() or not jar.name.endswith("-sources.jar"):
+            print(f"Sources jar not found: {jar}", file=sys.stderr)
+            return None
+        try:
+            jar.relative_to(mc_root)
+        except ValueError:
+            print(f"Sources jar is outside the Minecraft Loom cache: {jar}", file=sys.stderr)
+            return None
+        return jar
+
+    source_jars = find_source_jars(mc_root, version, variant)
+    if len(source_jars) == 1:
+        return source_jars[0]
+
     scope = f" for version '{version}'" if version else ""
-    print(f"No Minecraft sources jars found{scope} under {mc_root}.", file=sys.stderr)
-    print("Run the project's genSources task to generate source jars, then retry.", file=sys.stderr)
+    if not source_jars:
+        print(f"No Minecraft sources jars found{scope} under {mc_root}.", file=sys.stderr)
+        print("Run the project's genSources task to generate source jars, then retry.", file=sys.stderr)
+        return None
+
+    versions = sorted({jar.parent.name for jar in source_jars})
+    if len(versions) > 1 and version is None:
+        print("Multiple Minecraft versions have sources jars; specify --version:", file=sys.stderr)
+        for candidate in versions:
+            print(f"- {candidate}", file=sys.stderr)
+        return None
+
+    variants = sorted({cache_variant(jar) for jar in source_jars})
+    print("Multiple Minecraft sources jars match; specify --variant or --jar:", file=sys.stderr)
+    for candidate in variants:
+        print(f"- {candidate}", file=sys.stderr)
     return None
+
+
+def warn_unreadable_source_jar(jar: Path, error: Exception) -> None:
+    print(f"Skipping unreadable Minecraft sources jar '{jar}': {error}", file=sys.stderr)
 
 
 def add_output_arguments(parser: argparse.ArgumentParser, *, suppress_defaults: bool = False) -> None:
@@ -74,7 +117,9 @@ def add_output_arguments(parser: argparse.ArgumentParser, *, suppress_defaults: 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Find and inspect Minecraft jars from Fabric Loom cache.")
     parser.add_argument("--project-root", default=".", help="Path to project root.")
-    parser.add_argument("--version", help="Filter by version segment in path, such as 1.21.11 or 26.1-snapshot-10.")
+    parser.add_argument("--version", help="Filter by exact cache version directory, such as 1.21.11 or 26.1-snapshot-10.")
+    parser.add_argument("--variant", help="Select a Loom cache variant, such as minecraft-merged-48b5f51cd7.")
+    parser.add_argument("--jar", help="Select one exact -sources.jar under the project Minecraft Loom cache.")
     add_output_arguments(parser)
     subparsers = parser.add_subparsers(dest="command")
     find_parser = subparsers.add_parser("find", help="List Minecraft jars (the default action).")
@@ -94,13 +139,22 @@ def main() -> int:
     grep_parser.add_argument("--ignore-case", action="store_true", help="Match the pattern case-insensitively.")
     args = parser.parse_args()
 
+    if args.jar and (args.version or args.variant):
+        parser.error("--jar cannot be combined with --version or --variant")
+
     mc_root = minecraft_cache_root(args.project_root)
     if not mc_root.exists():
         print(f"Minecraft Loom cache root not found: {mc_root}", file=sys.stderr)
         return 2
 
     if args.command in (None, "find"):
-        jars = find_jars(mc_root, args.version)
+        if args.jar:
+            selected_jar = require_source_jar(mc_root, None, None, args.jar)
+            if selected_jar is None:
+                return 1
+            jars = [selected_jar]
+        else:
+            jars = find_jars(mc_root, args.version, args.variant)
         if args.limit > 0:
             jars = jars[: args.limit]
         if not jars:
@@ -110,31 +164,32 @@ def main() -> int:
         emit_paths(jars, args.json)
         return 0
 
-    source_jars = require_source_jars(mc_root, args.version)
-    if source_jars is None:
+    source_jar = require_source_jar(mc_root, args.version, args.variant, args.jar)
+    if source_jar is None:
         return 1
 
     if args.command == "read":
         entry = source_entry(args.class_name)
-        for jar in source_jars:
-            try:
-                with ZipFile(jar) as archive:
-                    if entry in archive.namelist():
-                        print(archive.read(entry).decode("utf-8"), end="")
-                        return 0
-            except BadZipFile:
-                continue
+        try:
+            with ZipFile(source_jar) as archive:
+                if entry in archive.namelist():
+                    print(archive.read(entry).decode("utf-8"), end="")
+                    return 0
+        except (BadZipFile, OSError, UnicodeDecodeError) as error:
+            warn_unreadable_source_jar(source_jar, error)
         print(f"Source entry not found: {entry}", file=sys.stderr)
         return 1
 
     if args.command == "search":
         query = args.query.casefold()
         results = []
-        for jar in source_jars:
-            with ZipFile(jar) as archive:
+        try:
+            with ZipFile(source_jar) as archive:
                 for entry in archive.namelist():
                     if entry.endswith(".java") and query in entry.casefold():
-                        results.append(f"{jar}!/{entry}")
+                        results.append(f"{source_jar}!/{entry}")
+        except (BadZipFile, OSError) as error:
+            warn_unreadable_source_jar(source_jar, error)
         if args.limit > 0:
             results = results[: args.limit]
         if not results:
@@ -150,20 +205,20 @@ def main() -> int:
         return 2
 
     matches = []
-    for jar in source_jars:
-        with ZipFile(jar) as archive:
+    try:
+        with ZipFile(source_jar) as archive:
             for entry in archive.namelist():
                 if not entry.endswith(".java"):
                     continue
                 for line_number, line in enumerate(archive.read(entry).decode("utf-8").splitlines(), start=1):
                     if pattern.search(line):
-                        matches.append({"jar": str(jar), "entry": entry, "line": line_number, "text": line})
+                        matches.append({"jar": str(source_jar), "entry": entry, "line": line_number, "text": line})
                         if args.limit > 0 and len(matches) >= args.limit:
                             break
                 if args.limit > 0 and len(matches) >= args.limit:
                     break
-        if args.limit > 0 and len(matches) >= args.limit:
-            break
+    except (BadZipFile, OSError, UnicodeDecodeError) as error:
+        warn_unreadable_source_jar(source_jar, error)
     if not matches:
         print(f"No Java source lines matched '{args.pattern}'.")
         return 1
