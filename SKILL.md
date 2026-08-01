@@ -21,7 +21,9 @@ Use this skill to execute Fabric tasks with a stable workflow and avoid re-disco
 
 ## Project Validation
 
-Run `python scripts/analyze_fabric_project.py --project-root <root> --require-loom --json` from project root first.
+Inspect the root project's `settings.gradle(.kts)`, `build.gradle(.kts)`, `gradle.properties`, and
+`gradle/libs.versions.toml` when present. Confirm a Loom plugin id in the root build before
+making Fabric-specific edits.
 
 Add `--resolve-remote` only when local files do not provide enough version information, when you need to verify latest compatible versions, or when the task explicitly requires remote confirmation. Avoid HTTP requests when local project metadata is sufficient.
 
