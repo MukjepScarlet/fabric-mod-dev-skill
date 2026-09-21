@@ -21,6 +21,7 @@ The version folder usually contains one or more jar files.
 ## High-Value Package Prefixes
 
 - `com.mojang.blaze3d`
+- `com.mojang.renderpearl`
 - `net.minecraft`
 
 Start from these prefixes when tracking rendering, UI, world logic, networking, and entity systems.

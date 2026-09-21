@@ -106,6 +106,7 @@ The legacy command without a subcommand still lists candidate jars. Source-inspe
 Prioritize these package prefixes while tracing behavior:
 
 - `com.mojang.blaze3d`
+- `com.mojang.renderpearl`
 - `net.minecraft`
 
 For lookup details and examples, read `references/minecraft-source-inspection.md`.
@@ -120,7 +121,7 @@ For lookup details and examples, read `references/minecraft-source-inspection.md
 - If a removed vanilla target cannot be migrated equivalently, skip that behavior temporarily and document the unresolved semantic migration instead of forcing a brittle hook.
 - Add concise version-scoped TODO comments when a migrated mixin preserves compilation but still needs runtime behavior revalidation.
 - For rendering or UI issues, inspect both:
-  - `com.mojang.blaze3d.*` for low-level rendering paths
+  - `com.mojang.blaze3d.*` and `com.mojang.renderpearl.*` for low-level rendering paths
   - `net.minecraft.client.*` for client behavior
 - For game logic issues, inspect `net.minecraft.*` server/common packages first.
 
